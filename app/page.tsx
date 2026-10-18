@@ -1,5 +1,22 @@
 import { cotizaciones, farmacia, productos, proveedores } from "../lib/datos";
 import { necesitaReposicion, recomendarTodo } from "../lib/comparador";
+import { ejecutarAgente } from "../lib/agente";
+import { ServicioPagosSimulado } from "../lib/pagos";
+import {
+  ACTIVO_DEMO,
+  estadoInicialDemo,
+  FECHA_DEMO,
+  politicaDemo,
+} from "../lib/configuracion";
+
+const estilosRegistro: Record<string, string> = {
+  analisis: "bg-slate-100 text-slate-700",
+  propuesta: "bg-sky-50 text-sky-700",
+  aprobado: "bg-emerald-50 text-emerald-700",
+  pago: "bg-emerald-100 text-emerald-800",
+  rechazado: "bg-red-50 text-red-700",
+  error: "bg-red-100 text-red-800",
+};
 
 const moneda = (valor: number) =>
   new Intl.NumberFormat("es-BO", {
@@ -7,8 +24,18 @@ const moneda = (valor: number) =>
     currency: "BOB",
   }).format(valor);
 
-export default function Home() {
+export default async function Home() {
   const productosBajos = productos.filter(necesitaReposicion);
+  const agente = await ejecutarAgente({
+    productos,
+    cotizaciones,
+    proveedores,
+    politica: politicaDemo,
+    estado: estadoInicialDemo,
+    servicioPagos: new ServicioPagosSimulado(),
+    fecha: FECHA_DEMO,
+    activo: ACTIVO_DEMO,
+  });
   const recomendaciones = recomendarTodo(productos, cotizaciones, proveedores);
   const ahorroTotal = recomendaciones.reduce(
     (suma, r) => suma + r.ahorroFrenteHabitual,
@@ -247,6 +274,41 @@ export default function Home() {
             </article>
           ))}
         </div>
+
+        <article className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-bold">Actividad del agente</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Límite por pago: {moneda(politicaDemo.limitePorTransaccion)} ·
+                Presupuesto diario: {moneda(politicaDemo.presupuestoDiario)}
+              </p>
+            </div>
+            <div className="flex gap-2 text-xs font-medium">
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
+                {agente.aprobadas} pagados
+              </span>
+              <span className="rounded-full bg-red-50 px-3 py-1 text-red-700">
+                {agente.rechazadas} rechazados
+              </span>
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">
+                Pagos: simulación
+              </span>
+            </div>
+          </div>
+          <ol className="space-y-2">
+            {agente.registro.map((entrada) => (
+              <li key={entrada.momento} className="flex gap-3 text-sm">
+                <span
+                  className={`h-fit whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ${estilosRegistro[entrada.tipo]}`}
+                >
+                  {entrada.tipo}
+                </span>
+                <span className="text-slate-700">{entrada.mensaje}</span>
+              </li>
+            ))}
+          </ol>
+        </article>
 
         <footer className="mt-8 flex flex-wrap justify-between gap-2 border-t border-slate-200 pt-5 text-xs text-slate-400">
           <p>PrecioJusto Pharma AI · Prototipo para ideathon</p>
