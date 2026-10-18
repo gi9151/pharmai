@@ -19,3 +19,13 @@ export const estadoInicialDemo: EstadoPagos = {
   pagosRealizados: [],
   saldoDisponible: 500,
 };
+
+// Política para la prueba en Stellar Testnet (importes en XLM de prueba, sin valor).
+export const politicaTestnet: Politica = {
+  limitePorTransaccion: 60,
+  presupuestoDiario: 120,
+  destinatariosPermitidos: ["prov-001"], // solo la cuenta de prueba autorizada
+  activosPermitidos: ["XLM"],
+  redesPermitidas: ["stellar-testnet"],
+  pagosDetenidos: false,
+};

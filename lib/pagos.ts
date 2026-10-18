@@ -8,6 +8,7 @@ import type { DecisionPago, SolicitudPago } from "./politicas";
 
 export type ResultadoPago =
   | { estado: "simulado"; referencia: string }
+  | { estado: "confirmado"; referencia: string } // verificado en la red (referencia = hash)
   | { estado: "rechazado"; error: string };
 
 export interface ServicioPagos {

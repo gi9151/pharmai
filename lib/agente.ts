@@ -111,7 +111,12 @@ export async function ejecutarAgente(ctx: ContextoAgente): Promise<ResultadoAgen
         fecha: solicitud.fecha,
       });
       estado.saldoDisponible -= solicitud.importe;
-      anotar("pago", `${rec.producto.nombreGenerico}: pago SIMULADO registrado (ref. ${resultado.referencia}). No se movió dinero real.`);
+      anotar(
+        "pago",
+        resultado.estado === "confirmado"
+          ? `${rec.producto.nombreGenerico}: pago CONFIRMADO en Stellar Testnet (hash ${resultado.referencia}). Activos de prueba, sin valor real.`
+          : `${rec.producto.nombreGenerico}: pago SIMULADO registrado (ref. ${resultado.referencia}). No se movió dinero real.`,
+      );
       aprobadas++;
     } catch {
       anotar("error", `${rec.producto.nombreGenerico}: error al ejecutar el pago. No se asume que se haya pagado.`);

@@ -1,0 +1,62 @@
+{
+  "fecha": "2026-10-18T15:14:12.500Z",
+  "registro": [
+    {
+      "momento": 1,
+      "tipo": "analisis",
+      "mensaje": "Se detectaron 3 productos por debajo del stock mínimo."
+    },
+    {
+      "momento": 2,
+      "tipo": "propuesta",
+      "mensaje": "Ibuprofeno: propone pagar 54.00 XLM a Distribuidora Andina (demo). Se elige Distribuidora Andina (demo) por tener el menor costo total válido (50 unidades + transporte). FarmaBol (demo) tenía el precio unitario más bajo, pero el lote vence en 105 días (mínimo 180)."
+    },
+    {
+      "momento": 3,
+      "tipo": "rechazado",
+      "mensaje": "Ibuprofeno: rechazado por políticas. Pago duplicado: ya existe un pago con este identificador. Se superaría el presupuesto diario de 120 (ya gastado hoy: 105.4)."
+    },
+    {
+      "momento": 4,
+      "tipo": "propuesta",
+      "mensaje": "Amoxicilina: propone pagar 51.40 XLM a Distribuidora Andina (demo). Se elige Distribuidora Andina (demo) por tener el menor costo total válido (28 unidades + transporte). Medicamentos del Sur (demo) tenía el precio unitario más bajo, pero solo tiene 10 unidades y se necesitan 28."
+    },
+    {
+      "momento": 5,
+      "tipo": "rechazado",
+      "mensaje": "Amoxicilina: rechazado por políticas. Pago duplicado: ya existe un pago con este identificador. Se superaría el presupuesto diario de 120 (ya gastado hoy: 105.4)."
+    },
+    {
+      "momento": 6,
+      "tipo": "propuesta",
+      "mensaje": "Omeprazol: propone pagar 54.90 XLM a Distribuidora Andina (demo). Se elige Distribuidora Andina (demo) por tener el menor costo total válido (42 unidades + transporte). FarmaBol (demo) tenía el precio unitario más bajo, pero su costo total era mayor."
+    },
+    {
+      "momento": 7,
+      "tipo": "rechazado",
+      "mensaje": "Omeprazol: rechazado por políticas. Se superaría el presupuesto diario de 120 (ya gastado hoy: 105.4)."
+    },
+    {
+      "momento": 8,
+      "tipo": "analisis",
+      "mensaje": "Resumen: 0 pagos ejecutados, 3 rechazados."
+    }
+  ],
+  "estadoFinal": {
+    "pagosRealizados": [
+      {
+        "idempotencia": "orden-prod-002-prov-001-2026-10-18",
+        "importe": 54,
+        "fecha": "2026-10-18"
+      },
+      {
+        "idempotencia": "orden-prod-003-prov-001-2026-10-18",
+        "importe": 51.4,
+        "fecha": "2026-10-18"
+      }
+    ],
+    "saldoDisponible": 9894.59998
+  },
+  "aprobadas": 0,
+  "rechazadas": 3
+}
