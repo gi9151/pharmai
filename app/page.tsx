@@ -8,6 +8,10 @@ import {
   FECHA_DEMO,
   politicaDemo,
 } from "../lib/configuracion";
+import { leerControl, leerHistorial } from "../lib/historial";
+import { cambiarPagosDetenidos } from "../lib/acciones";
+
+
 
 const estilosRegistro: Record<string, string> = {
   analisis: "bg-slate-100 text-slate-700",
@@ -26,11 +30,23 @@ const moneda = (valor: number) =>
 
 export default async function Home() {
   const productosBajos = productos.filter(necesitaReposicion);
+  const control = leerControl();
+  let historial;
+  let errorHistorial: string | null = null;
+  try {
+    historial = leerHistorial();
+  } catch (error) {
+    historial = { pagosRealizados: [], ejecuciones: [] };
+    errorHistorial = error instanceof Error ? error.message : "No se pudo leer el historial.";
+  }
+  const pagosTestnet = historial.ejecuciones.flatMap((ejecucion) =>
+    ejecucion.transacciones.map((t) => ({ ...t, fechaEjecucion: ejecucion.fecha })),
+  );
   const agente = await ejecutarAgente({
     productos,
     cotizaciones,
     proveedores,
-    politica: politicaDemo,
+    politica: { ...politicaDemo, pagosDetenidos: control.pagosDetenidos },
     estado: estadoInicialDemo,
     servicioPagos: new ServicioPagosSimulado(),
     fecha: FECHA_DEMO,
@@ -275,10 +291,106 @@ export default async function Home() {
           ))}
         </div>
 
+        <div className="mt-8 grid gap-6 xl:grid-cols-3">
+          <article
+            className={`rounded-2xl border p-6 ${
+              control.pagosDetenidos
+                ? "border-red-300 bg-red-50"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <h3 className="text-lg font-bold">Control de pagos</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Entornos: simulación (panel) y Stellar Testnet (script)
+            </p>
+            <p
+              className={`mt-5 text-2xl font-bold ${
+                control.pagosDetenidos ? "text-red-700" : "text-emerald-700"
+              }`}
+            >
+              {control.pagosDetenidos ? "⛔ Pagos detenidos" : "● Pagos habilitados"}
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              {control.pagosDetenidos
+                ? "El agente seguirá analizando y proponiendo, pero no ejecutará ningún pago."
+                : "El agente paga solo lo que cumple todas las políticas."}
+            </p>
+            <form action={cambiarPagosDetenidos} className="mt-5">
+              <input
+                type="hidden"
+                name="accion"
+                value={control.pagosDetenidos ? "reanudar" : "detener"}
+              />
+              <button
+                type="submit"
+                className={`w-full rounded-xl px-4 py-3 text-sm font-semibold text-white ${
+                  control.pagosDetenidos
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : "bg-red-600 hover:bg-red-700"
+                }`}
+              >
+                {control.pagosDetenidos
+                  ? "Reanudar pagos"
+                  : "Botón de emergencia: detener pagos"}
+              </button>
+            </form>
+          </article>
+
+          <article className="rounded-2xl border border-slate-200 bg-white p-6 xl:col-span-2">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold">Pagos en Stellar Testnet</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Verificados en la red · activos de prueba, sin valor real
+                </p>
+              </div>
+              <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
+                {historial.ejecuciones.length} ejecuciones registradas
+              </span>
+            </div>
+            {errorHistorial && (
+              <p className="mb-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                {errorHistorial}
+              </p>
+            )}
+            {pagosTestnet.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                Aún no hay pagos con enlace guardado. Ejecuta{" "}
+                <code className="rounded bg-slate-100 px-1">pnpm exec tsx scripts/pago-testnet.ts</code>
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {pagosTestnet.map((pago) => (
+                  <li
+                    key={pago.referencia}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 p-4 text-sm"
+                  >
+                    <div>
+                      <p className="font-semibold">{pago.producto}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {pago.importe.toFixed(2)} {pago.activo} ·{" "}
+                        {new Date(pago.fechaEjecucion).toLocaleString("es-BO")}
+                      </p>
+                    </div>
+                    <a
+                      href={`https://stellar.expert/explorer/testnet/tx/${pago.referencia}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"
+                    >
+                      Ver transacción ↗
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
+        </div>
+
         <article className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-lg font-bold">Actividad del agente</h3>
+              <h3 className="text-lg font-bold">Actividad del agente (simulación)</h3>
               <p className="mt-1 text-sm text-slate-500">
                 Límite por pago: {moneda(politicaDemo.limitePorTransaccion)} ·
                 Presupuesto diario: {moneda(politicaDemo.presupuestoDiario)}
@@ -312,7 +424,7 @@ export default async function Home() {
 
         <footer className="mt-8 flex flex-wrap justify-between gap-2 border-t border-slate-200 pt-5 text-xs text-slate-400">
           <p>PrecioJusto Pharma AI · Prototipo para ideathon</p>
-          <p>Modo seguro: sin pagos ni conexiones bancarias</p>
+          <p>Modo seguro: solo simulación y Stellar Testnet, sin dinero real</p>
         </footer>
       </section>
     </main>

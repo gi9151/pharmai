@@ -1,17 +1,22 @@
 // Ejecuta el agente con pagos REALES en Stellar TESTNET (activos de prueba, sin valor).
-// Verifica cada transacción en la red y guarda el registro en data/registro-testnet.json.
+// Verifica cada transacción en la red y AGREGA la ejecución al historial de auditoría.
 //
 // Uso:  pnpm exec tsx scripts/pago-testnet.ts
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import type { PagoRegistrado } from "../lib/politicas";
 import { ejecutarAgente } from "../lib/agente";
 import { cotizaciones, productos, proveedores } from "../lib/datos";
 import { politicaTestnet } from "../lib/configuracion";
+import { agregarEjecucion, ARCHIVO_HISTORIAL, leerControl, leerHistorial } from "../lib/historial";
 import { HORIZON_TESTNET, ServicioPagosStellarTestnet } from "../lib/stellar";
 
 async function main() {
   process.loadEnvFile(".env.local");
+
+  // Botón de emergencia: lo revisa el código, no la IA.
+  const control = leerControl();
+  if (control.pagosDetenidos) {
+    console.log("⛔ Los pagos están detenidos por el botón de emergencia. Reanúdalos desde el panel.\n");
+  }
 
   const servicio = new ServicioPagosStellarTestnet({
     horizonUrl: HORIZON_TESTNET,
@@ -23,23 +28,17 @@ async function main() {
   console.log(`Cuenta de la farmacia: ${servicio.cuentaPublica}`);
   console.log(`Saldo verificado en Testnet: ${saldo} XLM de prueba\n`);
 
-  // Pagos ya hechos en ejecuciones anteriores: así el agente no los repite (idempotencia).
-  const REGISTRO = "data/registro-testnet.json";
-  const pagosAnteriores: PagoRegistrado[] = existsSync(REGISTRO)
-    ? JSON.parse(readFileSync(REGISTRO, "utf8")).estadoFinal.pagosRealizados
-    : [];
-
-  // La fecha de hoy forma parte del identificador idempotente de cada orden.
-  const hoy = new Date().toISOString().slice(0, 10);
+  // Pagos de ejecuciones anteriores: así el agente no los repite (idempotencia).
+  const historial = leerHistorial();
 
   const resultado = await ejecutarAgente({
     productos,
     cotizaciones,
     proveedores,
-    politica: politicaTestnet,
-    estado: { pagosRealizados: pagosAnteriores, saldoDisponible: saldo },
+    politica: { ...politicaTestnet, pagosDetenidos: control.pagosDetenidos },
+    estado: { pagosRealizados: historial.pagosRealizados, saldoDisponible: saldo },
     servicioPagos: servicio,
-    fecha: hoy,
+    fecha: new Date().toISOString().slice(0, 10),
     activo: "XLM",
   });
 
@@ -47,20 +46,25 @@ async function main() {
     console.log(`[${entrada.tipo}] ${entrada.mensaje}`);
   }
 
-  const hashes = resultado.registro
-    .map((e) => e.mensaje.match(/hash ([0-9a-f]{64})/)?.[1])
-    .filter(Boolean);
-  if (hashes.length > 0) {
+  if (resultado.transacciones.length > 0) {
     console.log("\nVerifica las transacciones en el explorador:");
-    for (const h of hashes) console.log(`https://stellar.expert/explorer/testnet/tx/${h}`);
+    for (const t of resultado.transacciones) {
+      console.log(`${t.producto}: https://stellar.expert/explorer/testnet/tx/${t.referencia}`);
+    }
   }
 
-  mkdirSync("data", { recursive: true });
-  writeFileSync(
-    REGISTRO,
-    JSON.stringify({ fecha: new Date().toISOString(), ...resultado }, null, 2),
+  const nuevo = agregarEjecucion(
+    {
+      fecha: new Date().toISOString(),
+      red: servicio.red,
+      aprobadas: resultado.aprobadas,
+      rechazadas: resultado.rechazadas,
+      transacciones: resultado.transacciones,
+      registro: resultado.registro,
+    },
+    resultado.estadoFinal.pagosRealizados,
   );
-  console.log("\nRegistro guardado en data/registro-testnet.json");
+  console.log(`\nEjecución agregada a ${ARCHIVO_HISTORIAL} (${nuevo.ejecuciones.length} en total).`);
 }
 
 main().catch((error) => {

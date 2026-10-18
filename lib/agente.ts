@@ -30,7 +30,16 @@ export type ContextoAgente = {
   activo: string;
 };
 
+export type TransaccionAgente = {
+  producto: string;
+  importe: number;
+  activo: string;
+  estado: "simulado" | "confirmado";
+  referencia: string; // en Stellar Testnet es el hash de la transacción
+};
+
 export type ResultadoAgente = {
+  transacciones: TransaccionAgente[];
   registro: EntradaRegistro[];
   estadoFinal: EstadoPagos;
   aprobadas: number;
@@ -72,6 +81,7 @@ export async function ejecutarAgente(ctx: ContextoAgente): Promise<ResultadoAgen
   };
   let aprobadas = 0;
   let rechazadas = 0;
+  const transacciones: TransaccionAgente[] = [];
 
   const herramientas = crearHerramientas(ctx);
   const recomendaciones = herramientas.detectarReposiciones();
@@ -111,6 +121,13 @@ export async function ejecutarAgente(ctx: ContextoAgente): Promise<ResultadoAgen
         fecha: solicitud.fecha,
       });
       estado.saldoDisponible -= solicitud.importe;
+      transacciones.push({
+        producto: rec.producto.nombreGenerico,
+        importe: solicitud.importe,
+        activo: solicitud.activo,
+        estado: resultado.estado,
+        referencia: resultado.referencia,
+      });
       anotar(
         "pago",
         resultado.estado === "confirmado"
@@ -125,5 +142,5 @@ export async function ejecutarAgente(ctx: ContextoAgente): Promise<ResultadoAgen
   }
 
   anotar("analisis", `Resumen: ${aprobadas} pagos ejecutados, ${rechazadas} rechazados.`);
-  return { registro, estadoFinal: estado, aprobadas, rechazadas };
+  return { registro, transacciones, estadoFinal: estado, aprobadas, rechazadas };
 }
