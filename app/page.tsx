@@ -1,16 +1,5 @@
-
-const productos = [
-  { nombre: "Paracetamol 500 mg", categoria: "Analgésicos", stock: 120, minimo: 40, precio: 0.35 },
-  { nombre: "Ibuprofeno 400 mg", categoria: "Antiinflamatorios", stock: 18, minimo: 30, precio: 0.8 },
-  { nombre: "Amoxicilina 500 mg", categoria: "Antibióticos", stock: 12, minimo: 20, precio: 1.25 },
-  { nombre: "Loratadina 10 mg", categoria: "Antialérgicos", stock: 65, minimo: 25, precio: 0.6 },
-];
-
-const proveedores = [
-  { nombre: "Distribuidora Andina", precio: "Bs 32,00", entrega: "24 horas" },
-  { nombre: "FarmaBol", precio: "Bs 29,50", entrega: "48 horas" },
-  { nombre: "Medicamentos del Sur", precio: "Bs 34,00", entrega: "24 horas" },
-];
+import { cotizaciones, farmacia, productos, proveedores } from "../lib/datos";
+import { necesitaReposicion, recomendarTodo } from "../lib/comparador";
 
 const moneda = (valor: number) =>
   new Intl.NumberFormat("es-BO", {
@@ -19,7 +8,12 @@ const moneda = (valor: number) =>
   }).format(valor);
 
 export default function Home() {
-  const productosBajos = productos.filter((p) => p.stock < p.minimo);
+  const productosBajos = productos.filter(necesitaReposicion);
+  const recomendaciones = recomendarTodo(productos, cotizaciones, proveedores);
+  const ahorroTotal = recomendaciones.reduce(
+    (suma, r) => suma + r.ahorroFrenteHabitual,
+    0,
+  );
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -73,14 +67,12 @@ export default function Home() {
       <section className="mx-auto max-w-7xl p-5 sm:p-8 lg:ml-64 lg:p-10">
         <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-sm text-slate-500">
-              Inicio / Panel principal
-            </p>
+            <p className="text-sm text-slate-500">Inicio / Panel principal</p>
             <h2 className="mt-2 text-3xl font-bold tracking-tight">
               Tu farmacia, más inteligente.
             </h2>
             <p className="mt-2 text-slate-500">
-              Controla tus productos, compara precios y compra mejor.
+              {farmacia.nombre} · {farmacia.ciudad}
             </p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
@@ -108,9 +100,9 @@ export default function Home() {
         <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
             { titulo: "Productos registrados", valor: String(productos.length), nota: "En el catálogo de prueba" },
-            { titulo: "Alertas de inventario", valor: String(productosBajos.length), nota: "Requieren revisión" },
-            { titulo: "Proveedores", valor: String(proveedores.length), nota: "Con precios de ejemplo" },
-            { titulo: "Ahorro identificado", valor: "Bs 18,00", nota: "Estimación ficticia" },
+            { titulo: "Alertas de inventario", valor: String(productosBajos.length), nota: "Por debajo del stock mínimo" },
+            { titulo: "Proveedores", valor: String(proveedores.length), nota: `${cotizaciones.length} cotizaciones de ejemplo` },
+            { titulo: "Ahorro identificado", valor: moneda(ahorroTotal), nota: "Frente al proveedor habitual" },
           ].map((dato) => (
             <article
               key={dato.titulo}
@@ -123,99 +115,137 @@ export default function Home() {
           ))}
         </div>
 
+        <article className="mb-8 rounded-2xl border border-slate-200 bg-white p-6">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-bold">Inventario</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Existencias actuales frente al stock mínimo
+              </p>
+            </div>
+            <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+              {productosBajos.length} alertas
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-slate-500">
+                  <th className="pb-3 pr-4 font-medium">Producto</th>
+                  <th className="pb-3 pr-4 font-medium">Existencias</th>
+                  <th className="pb-3 pr-4 font-medium">Mínimo</th>
+                  <th className="pb-3 pr-4 font-medium">Precio compra</th>
+                  <th className="pb-3 pr-4 font-medium">Proveedor</th>
+                  <th className="pb-3 pr-4 font-medium">Vence</th>
+                  <th className="pb-3 font-medium">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productos.map((producto) => {
+                  const bajo = necesitaReposicion(producto);
+                  const proveedor = proveedores.find(
+                    (p) => p.id === producto.proveedorId,
+                  );
+                  return (
+                    <tr
+                      key={producto.id}
+                      className="border-b border-slate-50 last:border-0"
+                    >
+                      <td className="py-4 pr-4">
+                        <p className="font-semibold">{producto.nombreGenerico}</p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {producto.presentacion}
+                        </p>
+                      </td>
+                      <td className="py-4 pr-4">{producto.existencias}</td>
+                      <td className="py-4 pr-4">{producto.stockMinimo}</td>
+                      <td className="py-4 pr-4">{moneda(producto.precioCompra)}</td>
+                      <td className="py-4 pr-4 text-slate-600">
+                        {proveedor?.nombre ?? "—"}
+                      </td>
+                      <td className="py-4 pr-4 text-slate-600">
+                        {producto.vencimiento ?? "—"}
+                      </td>
+                      <td className="py-4">
+                        <span
+                          className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
+                            bajo
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-emerald-50 text-emerald-700"
+                          }`}
+                        >
+                          {bajo ? "Reponer" : "Disponible"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <h3 className="mb-4 text-lg font-bold">Comparación de proveedores</h3>
         <div className="grid gap-6 xl:grid-cols-3">
-          <article className="rounded-2xl border border-slate-200 bg-white p-6 xl:col-span-2">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-bold">Inventario de muestra</h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Productos que necesitan seguimiento
-                </p>
-              </div>
-              <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
-                {productosBajos.length} alertas
-              </span>
-            </div>
+          {recomendaciones.map((rec) => (
+            <article
+              key={rec.producto.id}
+              className="rounded-2xl border border-slate-200 bg-white p-6"
+            >
+              <p className="font-bold">{rec.producto.nombreGenerico}</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Se necesitan {rec.cantidadNecesaria} unidades
+              </p>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 text-slate-500">
-                    <th className="pb-3 pr-4 font-medium">Producto</th>
-                    <th className="pb-3 pr-4 font-medium">Stock</th>
-                    <th className="pb-3 pr-4 font-medium">Mínimo</th>
-                    <th className="pb-3 font-medium">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productos.map((producto) => {
-                    const bajo = producto.stock < producto.minimo;
-                    return (
-                      <tr
-                        key={producto.nombre}
-                        className="border-b border-slate-50 last:border-0"
-                      >
-                        <td className="py-4 pr-4">
-                          <p className="font-semibold">{producto.nombre}</p>
-                          <p className="mt-1 text-xs text-slate-400">
-                            {producto.categoria}
-                          </p>
-                        </td>
-                        <td className="py-4 pr-4">{producto.stock}</td>
-                        <td className="py-4 pr-4">{producto.minimo}</td>
-                        <td className="py-4">
-                          <span
-                            className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
-                              bajo
-                                ? "bg-amber-50 text-amber-700"
-                                : "bg-emerald-50 text-emerald-700"
-                            }`}
-                          >
-                            {bajo ? "Reponer" : "Disponible"}
+              <div className="mt-5 space-y-3">
+                {rec.evaluaciones.map((ev) => {
+                  const elegida = rec.elegida?.cotizacion.id === ev.cotizacion.id;
+                  return (
+                    <div
+                      key={ev.cotizacion.id}
+                      className={`rounded-xl border p-4 ${
+                        elegida
+                          ? "border-emerald-300 bg-emerald-50/50"
+                          : ev.valida
+                            ? "border-slate-100"
+                            : "border-slate-100 opacity-60"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-semibold">{ev.proveedor.nombre}</p>
+                        {elegida && (
+                          <span className="whitespace-nowrap rounded-full bg-emerald-100 px-2 py-1 text-xs text-emerald-700">
+                            Recomendado
                           </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </article>
+                        )}
+                        {!ev.valida && (
+                          <span className="whitespace-nowrap rounded-full bg-red-50 px-2 py-1 text-xs text-red-700">
+                            Rechazado
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-2 text-xl font-bold">{moneda(ev.costoTotal)}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {ev.cantidad} u × {moneda(ev.cotizacion.precioUnitario)} +{" "}
+                        {moneda(ev.costoTransporte)} transporte · entrega{" "}
+                        {ev.cotizacion.entregaHoras} h · vence {ev.cotizacion.vencimiento}
+                      </p>
+                      {ev.motivosRechazo.map((motivo) => (
+                        <p key={motivo} className="mt-1 text-xs text-red-600">
+                          {motivo}
+                        </p>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
 
-          <article className="rounded-2xl border border-slate-200 bg-white p-6">
-            <h3 className="text-lg font-bold">Comparación de proveedores</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Ejemplo de cotización para un pedido
-            </p>
-
-            <div className="mt-5 space-y-4">
-              {proveedores.map((proveedor, index) => (
-                <div
-                  key={proveedor.nombre}
-                  className="rounded-xl border border-slate-100 p-4"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-semibold">
-                      {proveedor.nombre}
-                    </p>
-                    {index === 1 && (
-                      <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
-                        Menor precio
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-3 text-xl font-bold">{proveedor.precio}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Entrega estimada: {proveedor.entrega}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-4 text-xs leading-5 text-slate-400">
-              Los precios y plazos son inventados. Verifica cotizaciones reales
-              antes de comprar.
-            </p>
-          </article>
+              <p className="mt-4 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                <span className="font-semibold">¿Por qué?</span> {rec.explicacion}
+              </p>
+            </article>
+          ))}
         </div>
 
         <footer className="mt-8 flex flex-wrap justify-between gap-2 border-t border-slate-200 pt-5 text-xs text-slate-400">
