@@ -103,10 +103,11 @@ Inventario + cotizaciones
 | `lib/historial.ts` | Historial acumulado y botón de emergencia. |
 | `app/page.tsx` | Panel de control. |
 | `scripts/` | Creación de cuentas de prueba y ejecución del agente en Testnet. |
+| `soroban/` | Contrato Soroban de la bóveda de compras. |
 
 ## Tecnologías
 
-Next.js (App Router) · React · TypeScript · Tailwind CSS · Stellar SDK · Stellar Testnet · Vitest
+Next.js (App Router) · React · TypeScript · Tailwind CSS · Stellar SDK · Stellar Testnet · Soroban (Rust) · Vitest
 
 ## Cómo ejecutarlo
 
@@ -141,9 +142,25 @@ pnpm exec tsx scripts/pago-testnet.ts
 
 Si se ejecuta dos veces el mismo día, los pagos se rechazan por duplicado.
 
+## Contrato Soroban: bóveda de compras
+
+En [`soroban/contracts/boveda/src/lib.rs`](soroban/contracts/boveda/src/lib.rs) está el contrato inteligente que llevará las políticas de pago **a la blockchain**, para que se cumplan incluso si el servidor fuera comprometido.
+
+| Función | Qué hace |
+|---|---|
+| `inicializar` | Define el administrador (la farmacia), el límite por pago y el presupuesto diario. |
+| `permitir` | Agrega un proveedor a la lista de destinatarios autorizados. |
+| `detener` | Botón de emergencia en la cadena. |
+| `autorizar` | Autoriza y registra un pago solo si cumple todas las reglas. |
+| `gastado_hoy` | Consulta cuánto se autorizó en el día. |
+
+Rechaza con errores explícitos: pagos detenidos (#3), importe inválido (#4), supera el límite (#5), supera el presupuesto diario (#6), destino no permitido (#7) y pago duplicado (#8).
+
+> **Estado:** el código está escrito y compila, pero **todavía no está desplegado en Testnet**. Por ahora la bóveda autoriza y registra pagos; el siguiente paso es que también custodie y transfiera los fondos.
+
 ## Próximos pasos
 
-- **Contrato Soroban "bóveda de compras":** aplicar los mismos límites directamente en la red, para que se cumplan incluso si el servidor fuera comprometido.
+- **Desplegar la bóveda Soroban** en Testnet e integrarla con el agente, para que los límites se apliquen tanto en el backend como en la red.
 - **Pagos en bolivianos:** integrar un proveedor local (QR o transferencia). Antes hay que verificar en su documentación oficial si permite pagos programáticos a terceros, consulta de estado, liquidación en BOB y un entorno de pruebas. El pago en Stellar y el pago efectivo a un proveedor boliviano son cosas distintas: puede requerir un intermediario y conversión a BOB.
 - **Validación con farmacias:** entrevistas para medir la frecuencia y el costo real del problema, y la disposición a pagar.
 - **Producto real:** base de datos PostgreSQL, inicio de sesión y permisos (el botón de emergencia aún no tiene autenticación), y conexión opcional a un modelo de IA manteniendo los límites en el código.
