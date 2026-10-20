@@ -69,7 +69,7 @@ Los límites **no dependen de instrucciones a la IA**: están en el código del 
 | Clave aislada | La clave secreta vive solo en el servicio de firma; el agente nunca la ve, no va al navegador ni a los registros. |
 | Verificación en la red | Un pago solo se marca como hecho después de confirmarlo en Stellar. |
 
-Todo esto está cubierto por **30 pruebas automáticas**.
+Todo esto está cubierto por **30 pruebas automáticas**, y las mismas reglas están también en un [contrato Soroban desplegado en Testnet](#contrato-soroban-bóveda-de-compras).
 
 ## Arquitectura
 
@@ -156,11 +156,42 @@ En [`soroban/contracts/boveda/src/lib.rs`](soroban/contracts/boveda/src/lib.rs) 
 
 Rechaza con errores explícitos: pagos detenidos (#3), importe inválido (#4), supera el límite (#5), supera el presupuesto diario (#6), destino no permitido (#7) y pago duplicado (#8).
 
-> **Estado:** el código está escrito y compila, pero **todavía no está desplegado en Testnet**. Por ahora la bóveda autoriza y registra pagos; el siguiente paso es que también custodie y transfiera los fondos.
+### Desplegado en Stellar Testnet
+
+**ID del contrato:** [`CCQA7TZGPEHDOUZE2LTKZCH4LVDHFMHPUCVNNZX7PS5P3W2S6QHCTI76`](https://stellar.expert/explorer/testnet/contract/CCQA7TZGPEHDOUZE2LTKZCH4LVDHFMHPUCVNNZX7PS5P3W2S6QHCTI76)
+
+Configurado con límite de 60 por pago, presupuesto de 120 por día y la Distribuidora Andina (demo) como destinatario autorizado. Pruebas ejecutadas en la red:
+
+| Prueba | Resultado |
+|---|---|
+| Pago de 54 a un proveedor autorizado | ✅ Aprobado ([transacción](https://stellar.expert/explorer/testnet/tx/535d0646c28aaa87fc16207105d9e9ee06d87000ffeb22ff355561307dcd4ec4)) |
+| Repetir el mismo pago | ❌ Error #8: duplicado |
+| Pago de 80 | ❌ Error #5: supera el límite |
+| Pago a un destino no autorizado | ❌ Error #7: destino no permitido |
+| Pago de 51 (total del día: 105) | ✅ Aprobado ([transacción](https://stellar.expert/explorer/testnet/tx/563c0e14956331a093834a8aa94c8b1a9a0a5cc5b5d006964a2ffc755d4ba0c2)) |
+| Pago de 55 (total sería 160) | ❌ Error #6: supera el presupuesto diario |
+| Pago con el botón de emergencia activo ([transacción](https://stellar.expert/explorer/testnet/tx/a16efa29cba1b221b0b6dd2ab5420bdf9428d1a23554b89cf062f78bf4f93de3)) | ❌ Error #3: pagos detenidos |
+
+Los pagos rechazados no aparecen en el explorador: la red simula la transacción, el contrato la rechaza y nunca llega a enviarse.
+
+> **Alcance actual:** la bóveda **autoriza y registra** pagos en la cadena aplicando las reglas, pero todavía no custodia ni transfiere los fondos; las transferencias de XLM las hace el agente por separado. El siguiente paso es unir ambas cosas.
+
+### Desplegarlo de nuevo
+
+Requiere Rust y la [CLI de Stellar](https://developers.stellar.org/docs/tools/cli). Desde la carpeta `soroban/`:
+
+```bash
+cargo test
+stellar contract build
+stellar keys generate admin --network testnet --fund
+stellar contract deploy --wasm target/wasm32v1-none/release/boveda.wasm --source-account admin --network testnet --alias boveda
+stellar contract invoke --id boveda --source-account admin --network testnet -- inicializar --admin $(stellar keys address admin) --limite 60 --presupuesto 120
+stellar contract invoke --id boveda --source-account admin --network testnet -- permitir --destino <CUENTA_DEL_PROVEEDOR>
+```
 
 ## Próximos pasos
 
-- **Desplegar la bóveda Soroban** en Testnet e integrarla con el agente, para que los límites se apliquen tanto en el backend como en la red.
+- **Integrar la bóveda Soroban con el agente:** que el agente solicite cada pago a la bóveda y que esta custodie y transfiera los fondos, para que los límites se apliquen tanto en el backend como en la red.
 - **Pagos en bolivianos:** integrar un proveedor local (QR o transferencia). Antes hay que verificar en su documentación oficial si permite pagos programáticos a terceros, consulta de estado, liquidación en BOB y un entorno de pruebas. El pago en Stellar y el pago efectivo a un proveedor boliviano son cosas distintas: puede requerir un intermediario y conversión a BOB.
 - **Validación con farmacias:** entrevistas para medir la frecuencia y el costo real del problema, y la disposición a pagar.
 - **Producto real:** base de datos PostgreSQL, inicio de sesión y permisos (el botón de emergencia aún no tiene autenticación), y conexión opcional a un modelo de IA manteniendo los límites en el código.

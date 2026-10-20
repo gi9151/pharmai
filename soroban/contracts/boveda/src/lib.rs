@@ -118,3 +118,5 @@ impl Boveda {
     }
 }
 
+#[cfg(test)]
+mod test;
